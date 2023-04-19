@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>DMS JSON Generator</title>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <!-- <link rel="stylesheet" href="styles.css"> -->
+  <style>
+
+.container {
+    max-width: 500px;
+    margin: 0 auto;
+    padding: 50px;
+    background-color: #f9f9f9;
+    border-radius: 5px;
+  }
+  
+  h1 {
+    text-align: center;
+  }
+  
+  .form-group {
+    margin-bottom: 20px;
+  }
+  
+  label {
+    display: block;
+    margin-bottom: 5px;
+  }
+  
+  input[type="file"] {
+    display: block;
+    margin-top: 5px;
+  }
+  
+  button[type="submit"] {
+    display: block;
+    margin-top: 20px;
+    padding: 10px;
+    background-color: #4CAF50;
+    color: #fff;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    font-size: 16px;
+  }
+  
+  button[type="submit"]:hover {
+    background-color: #3e8e41;
+  }
+  .copy-button { float:right }
+  
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>DMS JSON Generator</h1>
+    <form id="upload-form">
+      <div class="form-group">
+        <label for="csv-file">Select a CSV file:</label>
+        <input type="file" id="csv-file" name="csv-file">
+      </div>
+      <button type="submit">Generate JSON</button>
+    </form>
+  </div>
+  <div class="container">
+    <div class="form-group">
+      <label for="json-output">Generated JSON: 
+      <span class="copy-button">
+          <button type="button" id="copy-button">Copy to Clipboard</button>    
+      </span>
+      </label>
+      <textarea id="json-output" name="json-output" rows="70" cols="60"></textarea>
+    </div>
+  </div>
+  <script>
+    const form = document.getElementById("upload-form");
+
+    var templateMaker = function (object) {
+      return function (context) {
+          var replacer = function (key, val) {
+              if (typeof val === 'function') {
+                  return context[val()]
+              }
+              return val;
+          }
+          return JSON.parse(JSON.stringify(obj, replacer))
+      }
+    }
+
+    var obj = {
+      "rule-type": "selection",
+      "rule-id": function () { return 'rule_id' },
+      "rule-name": function () { return 'rule_id' },
+      "object-locator": {
+        "schema-name": function () { return 'schema_name' },
+        "table-name": function () { return 'table_name' }
+      },
+      "rule-action": "include"
+    }
+
+    var template = templateMaker(obj);
+
+    form.addEventListener("submit", (e) => {
+      e.preventDefault();
+
+      const fileInput = document.getElementById("csv-file");
+      const file = fileInput.files[0];
+
+      const reader = new FileReader();
+      reader.onload = () => {
+        const data = reader.result;
+        const lines = data.split("\n");
+
+        const headers = lines[0].split(",");
+        const rows = [];
+        const rules_outer = {}
+
+        for (let i = 1; i < lines.length; i++) {
+          const values = lines[i].split(",");
+          const row = {};
+
+          for (let j = 0; j < headers.length; j++) {
+            row[headers[j].trim()] = values[j].trim();
+          }
+          var data_inner = {
+              schema_name: row.schema_name,
+              table_name: row.table_name,
+              rule_id: i
+          }
+          var rendered = template(data_inner);
+          // console.log(JSON.stringify(rendered, null, 2));
+          rows.push(rendered);
+        }
+        // console.log(JSON.stringify(rows, null, 2))
+        rules_outer["rules"] = rows
+        // console.log(JSON.stringify(rules_outer, null, 2))
+        const jsonOutput = document.getElementById("json-output");
+        jsonOutput.value = JSON.stringify(rules_outer, null, 2);
+        
+        const copyButton = document.getElementById("copy-button");
+        copyButton.addEventListener("click", () => {
+        jsonOutput.select();
+        document.execCommand("copy");
+      });
+      };
+
+      reader.readAsText(file);
+    });
+
+  </script>
+</body>
+</html>
